@@ -53,7 +53,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         if (memberError) throw memberError;
         if (!memberships?.length) return NextResponse.json([], { status: 200 });
 
-        const groupIds = memberships.map((m: DbGroupMember) => m.group_id);
+        const groupIds = memberships.map((m: { group_id: string }) => m.group_id);
 
         // Fetch those groups
         const { data: groups, error: groupError } = await db
