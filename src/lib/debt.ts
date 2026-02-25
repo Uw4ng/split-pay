@@ -1,163 +1,261 @@
 /**
- * lib/debt.ts
+ * src/lib/debt.ts
  *
- * Debt minimisation algorithm for SplitPay.
+ * Debt Simplification — pure functions with no side effects.
  *
- * Given a list of expenses and the group members, computes the minimal set of
- * USDC transfers needed to settle all debts ("Splitwise algorithm").
+ * Problem: given a list of group expenses (each with a payer and per-member
+ * splits), compute the minimum number of USDC transfers needed to settle
+ * everyone's balance back to zero.
  *
- * All amounts are in USDC. Floating-point operations are rounded to 2 decimal
- * places to avoid cent-level drift (USDC has 6 on-chain decimals, but we
- * present with 2 for UX).
+ * Algorithm (Greedy Two-Pointer):
+ *   1. computeNetBalances  — credit payers, debit split members.
+ *   2. simplifyDebts       — greedily pair the most-indebted person with the
+ *                            most-owed person until all balances are cleared.
  *
- * Pure functions — no side effects, safe to call anywhere including tests.
+ * Precision rules:
+ *   - All amounts are rounded to 2 decimal places (round-half-up).
+ *   - Amounts < 0.01 are treated as zero (floating-point residue).
+ *
+ * This file has no imports from the rest of the codebase — it only relies
+ * on the local type definitions below, making it trivial to unit-test.
  */
 
-import type { Expense, Settlement, User } from '@/types';
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-// ── Internal helpers ──────────────────────────────────────────────────────────
-
-/**
- * Round to 2 decimal places (USDC display precision).
- */
-function round2(n: number): number {
-    return Math.round(n * 100) / 100;
+/** Minimal expense split shape needed by the algorithm */
+export interface DebtSplit {
+    userId: string;
+    amount: number; // the share this person owes
+    settled: boolean;
 }
 
+/** Minimal expense shape needed by the algorithm */
+export interface DebtExpense {
+    paidByUserId: string; // who footed the bill
+    amount: number;       // total amount paid
+    splits: DebtSplit[];  // how it is divided
+}
+
+/** Net balance per user: positive = creditor (is owed money), negative = debtor (owes money) */
+export type BalanceMap = Record<string, number>;
+
+/** A single transfer that settles debt: `fromUserId` pays `toUserId` exactly `amount` */
+export interface Settlement {
+    fromUserId: string;
+    toUserId: string;
+    amount: number; // always > 0, rounded to 2 d.p.
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+/** Amounts below this threshold are treated as zero (floating-point residue) */
+const EPSILON = 0.005; // rounds to 0.01
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 /**
- * Compute net balance for each user across all (unsettled) expenses.
- * Positive balance → owed money (creditor).
- * Negative balance → owes money (debtor).
+ * Round-half-up to 2 decimal places.
+ * e.g. round2(1.005) → 1.01, round2(1.004) → 1.00
  *
- * @returns Map from userId to net USDC balance
+ * We multiply by 100, add a tiny nudge for fp errors, round, then divide.
  */
-export function computeNetBalances(
-    expenses: Expense[]
-): Map<string, number> {
-    const balances = new Map<string, number>();
+export function round2(n: number): number {
+    return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+// ── Core functions ────────────────────────────────────────────────────────────
+
+/**
+ * Compute each user's net balance across all expenses.
+ *
+ * For every expense:
+ *   - the payer is credited the full expense amount (+)
+ *   - each split member is debited their share (-)
+ *   - already-settled splits are still included in the net balance
+ *     (they represent money that has already moved on-chain)
+ *
+ * Only unsettled splits feed into outstanding debt — pass `includeSettled`
+ * as false (default) to compute what is *still owed*, or true to compute
+ * the canonical historical balance.
+ *
+ * @param expenses        List of expenses to process
+ * @param includeSettled  If true, include already-settled splits in the debit
+ *                        calculation. Default: false (only count outstanding debt).
+ */
+export function calculateNetBalances(
+    expenses: DebtExpense[],
+    includeSettled = false
+): BalanceMap {
+    const balances: BalanceMap = {};
+
+    const credit = (userId: string, amount: number) => {
+        balances[userId] = round2((balances[userId] ?? 0) + amount);
+    };
+    const debit = (userId: string, amount: number) => {
+        balances[userId] = round2((balances[userId] ?? 0) - amount);
+    };
 
     for (const expense of expenses) {
-        // The payer fronted `amount` for the whole group.
-        const payerId = expense.paidBy.id;
+        // Ensure every userId referenced appears in the map
+        balances[expense.paidByUserId] = balances[expense.paidByUserId] ?? 0;
 
+        // Tally unsettled splits (or all splits if requested)
+        let debitedTotal = 0;
         for (const split of expense.splits) {
-            // Skip already-settled splits
-            if (split.settled) continue;
+            balances[split.userId] = balances[split.userId] ?? 0;
 
-            // The person who split owes `split.amount` to the payer.
-            // Payer's balance increases (they are owed).
-            // Splitter's balance decreases (they owe).
-
-            if (split.userId === payerId) {
-                // Payer's own share — net zero for the payer:
-                // they paid `amount` total, their share is `split.amount`.
-                // Effectively payer is creditor for (amount - their split).
-                // This is automatically handled by summing across all splits.
+            if (!includeSettled && split.settled) {
+                // This split is settled — the payer already received this money on-chain.
+                // Exclude both the credit and the debit so it doesn't skew current balances.
                 continue;
             }
 
-            // Debtor: owes split.amount to payer
-            const debtorBalance = balances.get(split.userId) ?? 0;
-            balances.set(split.userId, round2(debtorBalance - split.amount));
-
-            // Creditor: is owed split.amount by debtor
-            const creditorBalance = balances.get(payerId) ?? 0;
-            balances.set(payerId, round2(creditorBalance + split.amount));
+            debit(split.userId, split.amount);
+            debitedTotal = round2(debitedTotal + split.amount);
         }
+
+        // Credit the payer only for the portion not yet settled
+        credit(expense.paidByUserId, debitedTotal);
     }
 
     return balances;
 }
 
 /**
- * Debt minimisation using the "greedy creditor-debtor matching" approach.
+ * Compute the minimum set of transfers to bring every balance to zero.
  *
- * Steps:
- * 1. Compute net balances.
- * 2. Split into debtors (negative) and creditors (positive).
- * 3. Greedily match largest debtor to largest creditor, creating
- *    a settlement for min(|debtor|, |creditor|).
- * 4. Repeat until all balances are zero.
+ * Uses a greedy two-heap approach (implemented via sorted arrays):
+ *   - Sort creditors (positive balances) descending.
+ *   - Sort debtors  (negative balances) ascending (most negative first).
+ *   - Pair the largest debtor with the largest creditor.
+ *   - Transfer min(|debtor|, creditor).  Update both; repeat.
  *
- * This produces at most N-1 transfers for N participants (optimal).
+ * Time complexity: O(n² log n) in the worst case — acceptable for group sizes.
  *
- * @param expenses   All unsettled expenses in the group
- * @param members    All group members (needed to resolve User objects)
- * @returns          Minimal list of USDC settlements
+ * @param balances  BalanceMap from calculateNetBalances
+ * @returns         Ordered list of settlements (each amount > 0, rounded to 2 d.p.)
  */
-export function computeSettlements(
-    expenses: Expense[],
-    members: User[]
-): Settlement[] {
-    const balanceMap = computeNetBalances(expenses);
+export function simplifyDebts(balances: BalanceMap): Settlement[] {
+    const settlements: Settlement[] = [];
 
-    // Build user lookup
-    const userById = new Map<string, User>(members.map((m) => [m.id, m]));
-
-    // Separate into debtors (owe money) and creditors (are owed money)
-    const debtors: Array<{ userId: string; amount: number }> = [];
-    const creditors: Array<{ userId: string; amount: number }> = [];
-
-    for (const [userId, balance] of balanceMap.entries()) {
-        if (balance < -0.01) {
-            debtors.push({ userId, amount: Math.abs(balance) });
-        } else if (balance > 0.01) {
-            creditors.push({ userId, amount: balance });
+    // Working copy — avoid mutating the input
+    const working: BalanceMap = {};
+    for (const [id, bal] of Object.entries(balances)) {
+        const rounded = round2(bal);
+        if (Math.abs(rounded) >= EPSILON) {
+            working[id] = rounded;
         }
     }
 
-    // Sort largest first for optimal greedy matching
-    debtors.sort((a, b) => b.amount - a.amount);
-    creditors.sort((a, b) => b.amount - a.amount);
+    while (true) {
+        // Split into creditors (positive) and debtors (negative)
+        const creditors = Object.entries(working)
+            .filter(([, b]) => b > EPSILON)
+            .sort(([, a], [, b]) => b - a);       // descending: largest creditor first
 
-    const settlements: Settlement[] = [];
-    let d = 0;
-    let c = 0;
+        const debtors = Object.entries(working)
+            .filter(([, b]) => b < -EPSILON)
+            .sort(([, a], [, b]) => a - b);       // ascending: most indebted first
 
-    while (d < debtors.length && c < creditors.length) {
-        const debtor = debtors[d];
-        const creditor = creditors[c];
+        if (creditors.length === 0 || debtors.length === 0) break;
 
-        const amount = round2(Math.min(debtor.amount, creditor.amount));
+        const [creditorId, creditorBal] = creditors[0];
+        const [debtorId, debtorBal] = debtors[0];
 
-        const fromUser = userById.get(debtor.userId);
-        const toUser = userById.get(creditor.userId);
+        // Transfer is bounded by whichever side runs out first
+        const transfer = round2(Math.min(creditorBal, Math.abs(debtorBal)));
 
-        if (!fromUser || !toUser) {
-            throw new Error(
-                `User not found in members list: ${!fromUser ? debtor.userId : creditor.userId}`
-            );
-        }
+        if (transfer < EPSILON) break; // nothing meaningful left
 
-        settlements.push({ from: fromUser, to: toUser, amount });
+        settlements.push({
+            fromUserId: debtorId,
+            toUserId: creditorId,
+            amount: transfer,
+        });
 
-        debtor.amount = round2(debtor.amount - amount);
-        creditor.amount = round2(creditor.amount - amount);
+        // Update working balances
+        working[creditorId] = round2(creditorBal - transfer);
+        working[debtorId] = round2(debtorBal + transfer);
 
-        if (debtor.amount < 0.01) d++;
-        if (creditor.amount < 0.01) c++;
+        // Prune zero balances
+        if (Math.abs(working[creditorId]) < EPSILON) delete working[creditorId];
+        if (Math.abs(working[debtorId]) < EPSILON) delete working[debtorId];
     }
 
     return settlements;
 }
 
 /**
- * Convenience: given an expense and the number of members to split with,
- * returns the equal USDC share per person.
+ * High-level entry point: given group expenses and a member list,
+ * returns the minimum set of settlements needed to clear all debts.
+ *
+ * Members that have zero outstanding balance are omitted from the output.
+ *
+ * @param expenses  All expenses for a group (with splits)
+ * @param memberIds Optional allowlist of user IDs — ignored user IDs are filtered out.
+ *                  Pass an empty array (or omit) to include everyone in the expenses.
  */
-export function equalSplit(totalAmount: number, memberCount: number): number {
-    if (memberCount <= 0) throw new Error('memberCount must be greater than 0');
-    return round2(totalAmount / memberCount);
+export function getGroupSettlements(
+    expenses: DebtExpense[],
+    memberIds: string[] = []
+): Settlement[] {
+    const balances = calculateNetBalances(expenses);
+
+    // If a member allowlist is provided, zero out anyone not in the list
+    // (shouldn't happen in practice, but guards against data inconsistency)
+    if (memberIds.length > 0) {
+        const allowed = new Set(memberIds);
+        for (const id of Object.keys(balances)) {
+            if (!allowed.has(id)) delete balances[id];
+        }
+    }
+
+    return simplifyDebts(balances);
 }
 
 /**
- * Validates that all splits in an expense sum to the total amount.
- * Allows ±$0.01 rounding tolerance.
+ * Splits a total amount equally among N users, rounded to 2 d.p.
+ * The last member absorbs the rounding remainder so the total is always exact.
+ *
+ * @param total   Total amount to split
+ * @param userIds Array of user IDs to receive an equal share
+ */
+export function equalSplit(
+    total: number,
+    userIds: string[]
+): Record<string, number> {
+    if (userIds.length === 0) return {};
+    const share = round2(Math.floor((total / userIds.length) * 100) / 100);
+    const result: Record<string, number> = {};
+    let distributed = 0;
+
+    for (let i = 0; i < userIds.length - 1; i++) {
+        result[userIds[i]] = share;
+        distributed = round2(distributed + share);
+    }
+
+    // Last person absorbs the rounding remainder
+    result[userIds[userIds.length - 1]] = round2(total - distributed);
+    return result;
+}
+
+/**
+ * Validates that a set of splits sums to the total amount.
+ * Returns null if valid, or an error message if not.
+ *
+ * @param total   Expected total
+ * @param splits  Map of userId → amount
+ * @param tol     Tolerance for floating-point drift (default 0.01)
  */
 export function validateSplits(
-    totalAmount: number,
-    splitAmounts: number[]
-): boolean {
-    const sum = splitAmounts.reduce((acc, n) => acc + n, 0);
-    return Math.abs(sum - totalAmount) <= 0.01;
+    total: number,
+    splits: Record<string, number>,
+    tol = 0.01
+): string | null {
+    const sum = round2(Object.values(splits).reduce((s, v) => s + v, 0));
+    const diff = Math.abs(sum - round2(total));
+    if (diff > tol) {
+        return `Split amounts (${sum.toFixed(2)}) must sum to total (${round2(total).toFixed(2)})`;
+    }
+    return null;
 }
