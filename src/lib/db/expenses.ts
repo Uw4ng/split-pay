@@ -284,6 +284,61 @@ export async function markSplitAsSettled(
     return { data: rowToSplit(updated as ExpenseSplitRow), error: null };
 }
 
+// ── markSplitSettledById ──────────────────────────────────────────────────────
+
+/**
+ * Marks a split as settled using its row `id` (expense_splits.id).
+ * Used by /api/settle which only has the split's UUID, not the (expenseId, userId) pair.
+ *
+ * @param splitId  - expense_splits.id primary key
+ * @param txHash   - Arc transaction hash (must start with 0x, or 'pending')
+ */
+export async function markSplitSettledById(
+    splitId: string,
+    txHash: string
+): DbResult<ExpenseSplit> {
+    const db = getSupabaseAdmin();
+
+    // Look up current state
+    const { data: existing, error: fetchError } = await db
+        .from('expense_splits')
+        .select('*')
+        .eq('id', splitId)
+        .single();
+
+    if (fetchError) {
+        return {
+            data: null,
+            error: fetchError.code === 'PGRST116'
+                ? 'Split not found'
+                : fetchError.message,
+        };
+    }
+
+    const row = existing as ExpenseSplitRow;
+
+    if (row.settled) {
+        // Idempotent — caller treats 'already settled' as non-fatal
+        return { data: null, error: 'already settled' };
+    }
+
+    // Mark as settled
+    const { data: updated, error: updateError } = await db
+        .from('expense_splits')
+        .update({
+            settled: true,
+            settled_at: new Date().toISOString(),
+            tx_hash: txHash,
+        })
+        .eq('id', splitId)
+        .select()
+        .single();
+
+    if (updateError) return { data: null, error: updateError.message };
+
+    return { data: rowToSplit(updated as ExpenseSplitRow), error: null };
+}
+
 // ── getUnsettledSplitsForUser ─────────────────────────────────────────────────
 
 /**
