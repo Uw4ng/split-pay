@@ -75,8 +75,8 @@ export type ExpenseCategory =
  * Not stored directly — recomputed from expenses on demand.
  */
 export interface Settlement {
-  from: User;
-  to: User;
+  fromUserId: string;       // User.id of the debtor
+  toUserId: string;         // User.id of the creditor
   amount: number;           // USDC amount to transfer
 }
 
@@ -87,8 +87,8 @@ export interface Settlement {
 export interface SettlementTransaction {
   id: string;
   groupId: string;
-  from: User;
-  to: User;
+  fromUserId: string;       // User.id of debtor
+  toUserId: string;         // User.id of creditor
   amount: number;
   circleTransferId: string; // Circle transfer job ID
   txHash?: string;          // Arc transaction hash

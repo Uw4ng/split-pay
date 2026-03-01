@@ -1,113 +1,158 @@
 'use client';
 
 /**
- * (auth)/login/page.tsx
+ * src/app/(auth)/login/page.tsx
  *
- * SplitPay login page.
- * Users sign in with email — Circle Programmable Wallets handles
- * wallet creation automatically. No seed phrase needed.
+ * Magic-link login page.
+ * User enters their email → Supabase sends a one-time link → they click it
+ * → /auth/callback handles the session and wallet setup.
+ *
+ * No passwords, no private keys. Ever.
  */
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, type FormEvent } from 'react';
+import { supabase } from '@/lib/supabase';
+
+type Stage = 'idle' | 'loading' | 'sent' | 'error';
 
 export default function LoginPage() {
-    const router = useRouter();
     const [email, setEmail] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [emailSent, setEmailSent] = useState(false);
+    const [stage, setStage] = useState<Stage>('idle');
+    const [errorMsg, setErrorMsg] = useState('');
 
-    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+
+    async function handleSubmit(e: FormEvent<HTMLFormElement>) {
         e.preventDefault();
-        setError(null);
+        const trimmed = email.trim().toLowerCase();
+        if (!trimmed) return;
 
-        if (!email.trim() || !email.includes('@')) {
-            setError('Please enter a valid email address.');
+        setStage('loading');
+        setErrorMsg('');
+
+        const { error } = await supabase.auth.signInWithOtp({
+            email: trimmed,
+            options: {
+                emailRedirectTo: `${appUrl}/auth/callback`,
+                // Create user if they don't exist yet
+                shouldCreateUser: true,
+            },
+        });
+
+        if (error) {
+            setStage('error');
+            setErrorMsg(error.message);
             return;
         }
 
-        setIsLoading(true);
-        try {
-            // TODO: implement actual auth logic (Circle user creation + Supabase session)
-            // For now, just simulate a magic-link flow
-            await new Promise((res) => setTimeout(res, 1000));
-            setEmailSent(true);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
-        } finally {
-            setIsLoading(false);
-        }
-    }
-
-    if (emailSent) {
-        return (
-            <main className="flex min-h-screen items-center justify-center bg-background px-4">
-                <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-xl">
-                    <div className="mb-4 text-4xl">✉️</div>
-                    <h1 className="mb-2 text-xl font-bold text-foreground">Check your inbox</h1>
-                    <p className="text-sm text-muted-foreground">
-                        We sent a sign-in link to <span className="font-medium text-foreground">{email}</span>.
-                        Click it to log into SplitPay.
-                    </p>
-                </div>
-            </main>
-        );
+        setStage('sent');
     }
 
     return (
-        <main className="flex min-h-screen items-center justify-center bg-background px-4">
-            <div className="w-full max-w-md">
-                {/* Logo */}
-                <div className="mb-8 text-center">
-                    <div className="mb-2 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-2xl font-black text-primary-foreground">
-                        S
-                    </div>
-                    <h1 className="text-2xl font-bold text-foreground">Welcome to SplitPay</h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Split expenses. Settle with USDC. No crypto knowledge needed.
+        <main className="min-h-screen flex items-center justify-center bg-gray-950 px-4">
+            <div className="w-full max-w-sm">
+                {/* Logo / wordmark */}
+                <div className="mb-10 text-center">
+                    <h1 className="text-3xl font-bold text-white tracking-tight">
+                        Split<span className="text-indigo-400">Pay</span>
+                    </h1>
+                    <p className="mt-2 text-sm text-gray-400">
+                        Harcamaları paylaş. USDC ile öde.
                     </p>
                 </div>
 
-                {/* Form */}
-                <div className="rounded-2xl border border-border bg-card p-8 shadow-xl">
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-foreground">
-                                Email address
-                            </label>
-                            <input
-                                id="email"
-                                type="email"
-                                autoComplete="email"
-                                placeholder="you@example.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                disabled={isLoading}
-                                className="w-full rounded-lg border border-border bg-input px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
-                            />
-                        </div>
-
-                        {error && (
-                            <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                                {error}
+                {/* Card */}
+                <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-8 shadow-xl">
+                    {stage === 'sent' ? (
+                        /* ── Success state ───────────────────────────────────────────── */
+                        <div className="text-center space-y-4">
+                            <div className="flex justify-center">
+                                <span className="text-5xl" role="img" aria-label="email sent">📬</span>
+                            </div>
+                            <h2 className="text-lg font-semibold text-white">Link gönderildi!</h2>
+                            <p className="text-sm text-gray-400 leading-relaxed">
+                                <strong className="text-gray-200">{email}</strong> adresine giriş
+                                linki gönderdik. Gelen kutunu kontrol et.
                             </p>
-                        )}
+                            <button
+                                type="button"
+                                onClick={() => { setStage('idle'); setEmail(''); }}
+                                className="mt-4 w-full rounded-xl py-2.5 px-4 text-sm font-medium
+                           border border-white/10 text-gray-300 hover:bg-white/5
+                           transition-colors"
+                            >
+                                Farklı e-posta kullan
+                            </button>
+                        </div>
+                    ) : (
+                        /* ── Form state ──────────────────────────────────────────────── */
+                        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+                            <div>
+                                <label
+                                    htmlFor="email"
+                                    className="block text-sm font-medium text-gray-300 mb-1.5"
+                                >
+                                    E-posta adresi
+                                </label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    autoComplete="email"
+                                    required
+                                    placeholder="sen@example.com"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    disabled={stage === 'loading'}
+                                    className="
+                    w-full rounded-xl px-4 py-3 text-sm
+                    bg-white/8 border border-white/10
+                    text-white placeholder:text-gray-500
+                    focus:outline-none focus:ring-2 focus:ring-indigo-500/60
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    transition
+                  "
+                                />
+                            </div>
 
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {isLoading ? 'Sending…' : 'Continue with Email'}
-                        </button>
-                    </form>
+                            {/* Error message */}
+                            {stage === 'error' && (
+                                <p
+                                    role="alert"
+                                    className="text-sm text-red-400 bg-red-900/20 border border-red-500/20
+                             rounded-lg px-3 py-2"
+                                >
+                                    {errorMsg}
+                                </p>
+                            )}
 
-                    <p className="mt-6 text-center text-xs text-muted-foreground">
-                        By continuing, you agree to our Terms of Service and Privacy Policy.
-                        <br />
-                        A secure USDC wallet is automatically created for you.
-                    </p>
+                            <button
+                                type="submit"
+                                disabled={stage === 'loading' || !email.trim()}
+                                className="
+                  w-full rounded-xl py-3 px-4 text-sm font-semibold
+                  bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700
+                  text-white transition-colors
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  flex items-center justify-center gap-2
+                "
+                            >
+                                {stage === 'loading' ? (
+                                    <>
+                                        <span className="h-4 w-4 rounded-full border-2 border-white/30
+                                     border-t-white animate-spin" />
+                                        Gönderiliyor…
+                                    </>
+                                ) : (
+                                    'Giriş Linki Gönder'
+                                )}
+                            </button>
+
+                            <p className="text-center text-xs text-gray-500 leading-relaxed mt-2">
+                                Şifre yok. Cüzdan adresi veya private key gerekmez.
+                                <br />Sadece e-postana tıkla.
+                            </p>
+                        </form>
+                    )}
                 </div>
             </div>
         </main>

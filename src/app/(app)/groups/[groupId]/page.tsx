@@ -12,7 +12,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useGroupStore, selectActiveGroup } from '@/store/groupStore';
 import { useExpenseStore, selectGroupExpenses } from '@/store/expenseStore';
-import { computeSettlements } from '@/lib/debt';
+import { getGroupSettlements } from '@/lib/debt';
 import { ExpenseList } from '@/components/expenses/ExpenseList';
 import { SettlementSummary } from '@/components/settlement/SettlementSummary';
 
@@ -33,7 +33,25 @@ export default function GroupPage() {
     const settlements = useMemo(() => {
         if (!activeGroup) return [];
         try {
-            return computeSettlements(expenses, activeGroup.members);
+            // Map Expense[] → DebtExpense[] for the debt algorithm
+            const debtExpenses = expenses.map((exp) => ({
+                paidByUserId: typeof exp.paidBy === 'string' ? exp.paidBy : exp.paidBy.id,
+                amount: exp.amount,
+                splits: exp.splits.map((s) => ({
+                    userId: s.userId,
+                    amount: s.amount,
+                    settled: s.settled,
+                })),
+            }));
+            // Map debt.ts Settlement → old Settlement shape {from, to, amount}
+            return getGroupSettlements(
+                debtExpenses,
+                activeGroup.members.map((m) => m.id)
+            ).map((s) => ({
+                fromUserId: s.fromUserId,
+                toUserId: s.toUserId,
+                amount: s.amount,
+            }));
         } catch {
             return [];
         }

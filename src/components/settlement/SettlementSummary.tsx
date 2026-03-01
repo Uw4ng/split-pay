@@ -24,16 +24,17 @@ export function SettlementSummary({ settlements, groupId }: SettlementSummaryPro
             <div className="space-y-2">
                 {settlements.map((settlement, i) => (
                     <div
-                        key={`${settlement.from.id}-${settlement.to.id}-${i}`}
+                        key={`${settlement.fromUserId}-${settlement.toUserId}-${i}`}
                         className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3"
                     >
                         <p className="text-sm text-foreground">
+                            {/* Display abbreviated IDs until we can look up display names */}
                             <span className="font-semibold">
-                                {settlement.from.displayName ?? settlement.from.email}
-                            </span>{' '}
-                            owes{' '}
+                                {settlement.fromUserId.slice(0, 8)}
+                            </span>
+                            {' owes '}
                             <span className="font-semibold">
-                                {settlement.to.displayName ?? settlement.to.email}
+                                {settlement.toUserId.slice(0, 8)}
                             </span>
                         </p>
 

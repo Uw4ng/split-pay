@@ -5,6 +5,9 @@
  *
  * Confirmation modal before initiating a USDC settlement transfer.
  * The actual Circle transfer is triggered via POST /api/circle/transfer.
+ *
+ * Settlement now carries fromUserId/toUserId (string IDs).
+ * We look up wallet info from the Circle wallet-info API at confirm time.
  */
 
 import { useState } from 'react';
@@ -18,7 +21,7 @@ interface SettleConfirmModalProps {
 
 export function SettleConfirmModal({
     settlement,
-    groupId,
+    groupId: _groupId,
     onClose,
 }: SettleConfirmModalProps) {
     const [isLoading, setIsLoading] = useState(false);
@@ -29,15 +32,43 @@ export function SettleConfirmModal({
         setIsLoading(true);
         setError(null);
         try {
-            // TODO: get userToken from auth context/session
+            // Fetch the recipient's wallet address from our DB
+            const recipientRes = await fetch(
+                `/api/circle/wallet-info?userId=${encodeURIComponent(settlement.toUserId)}`
+            );
+            if (!recipientRes.ok) throw new Error('Could not resolve recipient wallet');
+            const recipientJson = await recipientRes.json() as {
+                success: boolean;
+                data?: { walletAddress: string };
+                error?: string;
+            };
+            if (!recipientJson.success || !recipientJson.data?.walletAddress) {
+                throw new Error(recipientJson.error ?? 'Recipient has no wallet yet');
+            }
+
+            // Fetch the sender's wallet ID from our DB
+            const senderRes = await fetch(
+                `/api/circle/wallet-info?userId=${encodeURIComponent(settlement.fromUserId)}`
+            );
+            if (!senderRes.ok) throw new Error('Could not resolve sender wallet');
+            const senderJson = await senderRes.json() as {
+                success: boolean;
+                data?: { walletId: string };
+                error?: string;
+            };
+            if (!senderJson.success || !senderJson.data?.walletId) {
+                throw new Error(senderJson.error ?? 'Sender has no wallet yet');
+            }
+
             const res = await fetch('/api/circle/transfer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    // userToken: from session
-                    fromWalletId: settlement.from.walletId,
-                    toAddress: settlement.to.walletAddress,
+                    // userToken is resolved from the Supabase session cookie server-side
+                    fromWalletId: senderJson.data.walletId,
+                    toAddress: recipientJson.data.walletAddress,
                     amount: settlement.amount.toFixed(2),
+                    idempotencyKey: crypto.randomUUID(),
                 }),
             });
 
@@ -46,8 +77,8 @@ export function SettleConfirmModal({
                 throw new Error(apiError);
             }
 
-            const { txHash: hash } = (await res.json()) as { txHash?: string };
-            setTxHash(hash ?? 'pending');
+            const { data } = (await res.json()) as { data?: { txHash?: string } };
+            setTxHash(data?.txHash ?? 'pending');
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Transfer failed. Please try again.');
         } finally {
@@ -88,14 +119,14 @@ export function SettleConfirmModal({
                         <div className="mb-4 rounded-xl bg-muted px-4 py-3 text-sm">
                             <div className="flex justify-between text-muted-foreground">
                                 <span>From</span>
-                                <span className="font-medium text-foreground">
-                                    {settlement.from.displayName ?? settlement.from.email}
+                                <span className="font-mono text-xs font-medium text-foreground">
+                                    {settlement.fromUserId.slice(0, 12)}…
                                 </span>
                             </div>
                             <div className="mt-1.5 flex justify-between text-muted-foreground">
                                 <span>To</span>
-                                <span className="font-medium text-foreground">
-                                    {settlement.to.displayName ?? settlement.to.email}
+                                <span className="font-mono text-xs font-medium text-foreground">
+                                    {settlement.toUserId.slice(0, 12)}…
                                 </span>
                             </div>
                             <div className="mt-1.5 flex justify-between text-muted-foreground">
