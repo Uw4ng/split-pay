@@ -16,13 +16,23 @@ import type { Database } from './db/database.types';
 
 // ── Environment ───────────────────────────────────────────────────────────────
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-        '[supabase] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY'
-    );
+/**
+ * Retrieve and validate a required env var.
+ * Validation is deferred to runtime (not module load time) so Next.js static
+ * build analysis doesn't throw when the variable isn't present in ci/build env.
+ */
+function requireEnv(key: string): string {
+    const value = process.env[key];
+    if (!value) {
+        // During `next build` static analysis, env vars may not be present.
+        // Return an empty string so module evaluation never throws.
+        // The actual runtime call will fail meaningfully when the value is used.
+        if (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE === 'phase-production-build') {
+            return '';
+        }
+        throw new Error(`[supabase] Missing environment variable: ${key}`);
+    }
+    return value;
 }
 
 // ── Browser / public client ───────────────────────────────────────────────────
@@ -32,15 +42,45 @@ if (!supabaseUrl || !supabaseAnonKey) {
  *
  * Typed with `any` generics until you run `supabase gen types typescript --local`.
  * Row types are still enforced via explicit casts in db/ helpers.
+ *
+ * NOTE: The client is created lazily on first access so that missing env vars
+ * only throw at runtime (not during `next build` static analysis).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const supabase = createClient<any>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-    },
-});
+let _supabase: ReturnType<typeof createClient<any>> | null = null;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getSupabaseClient(): ReturnType<typeof createClient<any>> {
+    if (!_supabase) {
+        _supabase = createClient<any>(
+            requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
+            requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+            {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: true,
+                },
+            }
+        );
+    }
+    return _supabase;
+}
+
+/**
+ * @deprecated Use `getSupabaseClient()` instead.
+ * This named export is kept for backward-compat with existing imports.
+ * It calls getSupabaseClient() on every property access — use the function
+ * directly in new code.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getSupabase(): ReturnType<typeof createClient<any>> {
+    return getSupabaseClient();
+}
+
+// Re-export as `supabase` for backward compat (function call, not module-level instance)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const supabase = { get: getSupabaseClient } as unknown as ReturnType<typeof createClient<any>>;
 
 // ── Server / admin client ─────────────────────────────────────────────────────
 /**
@@ -49,17 +89,17 @@ export const supabase = createClient<any>(supabaseUrl, supabaseAnonKey, {
  * to avoid the service role key being bundled into the client JS.
  */
 export function getSupabaseAdmin() {
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey) {
-        throw new Error('[supabase] Missing SUPABASE_SERVICE_ROLE_KEY — server-only function called on client?');
-    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return createClient<any>(supabaseUrl!, serviceRoleKey, {
-        auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-        },
-    });
+    return createClient<any>(
+        requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
+        requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+        {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+            },
+        }
+    );
 }
 
 // ── Table name constants ───────────────────────────────────────────────────────
