@@ -17,44 +17,35 @@ import type { Database } from './db/database.types';
 // ── Environment ───────────────────────────────────────────────────────────────
 
 /**
- * Retrieve and validate a required env var.
- * Validation is deferred to runtime (not module load time) so Next.js static
- * build analysis doesn't throw when the variable isn't present in ci/build env.
+ * Returns the env var or a safe placeholder when building without env vars.
+ * Placeholder values produce a non-functional client (network errors, not crashes).
+ * At runtime with real env vars (e.g. Vercel production), this always returns the real value.
  */
+function getEnv(key: string, placeholder: string): string {
+    return process.env[key] ?? placeholder;
+}
+
 function requireEnv(key: string): string {
     const value = process.env[key];
-    if (!value) {
-        // During `next build` static analysis, env vars may not be present.
-        // Return an empty string so module evaluation never throws.
-        // The actual runtime call will fail meaningfully when the value is used.
-        if (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE === 'phase-production-build') {
-            return '';
-        }
-        throw new Error(`[supabase] Missing environment variable: ${key}`);
-    }
+    if (!value) throw new Error(`[supabase] Missing environment variable: ${key}`);
     return value;
 }
 
 // ── Browser / public client ───────────────────────────────────────────────────
-/**
- * Safe to import in client components.
- * All queries are subject to Row Level Security policies.
- *
- * Typed with `any` generics until you run `supabase gen types typescript --local`.
- * Row types are still enforced via explicit casts in db/ helpers.
- *
- * NOTE: The client is created lazily on first access so that missing env vars
- * only throw at runtime (not during `next build` static analysis).
- */
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: ReturnType<typeof createClient<any>> | null = null;
 
+/**
+ * Lazy singleton — safe to call from client components.
+ * Uses placeholder URL/key at build time so module evaluation never throws.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getSupabaseClient(): ReturnType<typeof createClient<any>> {
     if (!_supabase) {
         _supabase = createClient<any>(
-            requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
-            requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+            getEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://localhost:54321'),
+            getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'placeholder-anon-key'),
             {
                 auth: {
                     persistSession: true,
@@ -68,25 +59,26 @@ export function getSupabaseClient(): ReturnType<typeof createClient<any>> {
 }
 
 /**
- * @deprecated Use `getSupabaseClient()` instead.
- * This named export is kept for backward-compat with existing imports.
- * It calls getSupabaseClient() on every property access — use the function
- * directly in new code.
+ * Pre-initialised singleton for convenience imports (`import { supabase } from ...`).
+ * Safe to use in client components — always returns the same real Supabase client.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getSupabase(): ReturnType<typeof createClient<any>> {
-    return getSupabaseClient();
-}
-
-// Re-export as `supabase` for backward compat (function call, not module-level instance)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const supabase = { get: getSupabaseClient } as unknown as ReturnType<typeof createClient<any>>;
+export const supabase: ReturnType<typeof createClient<any>> = createClient<any>(
+    getEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://localhost:54321'),
+    getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'placeholder-anon-key'),
+    {
+        auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+        },
+    }
+);
 
 // ── Server / admin client ─────────────────────────────────────────────────────
 /**
  * Bypasses RLS. SERVER-SIDE ONLY.
- * Always call getSupabaseAdmin() inside the handler — never cache as a module-level export
- * to avoid the service role key being bundled into the client JS.
+ * Always call getSupabaseAdmin() inside a handler — never at module level.
  */
 export function getSupabaseAdmin() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
