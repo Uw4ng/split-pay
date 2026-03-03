@@ -93,7 +93,7 @@ export default function GroupPage() {
                     <div className="text-5xl">🔍</div>
                     <p className="text-gray-400 text-sm">Grup bulunamadı.</p>
                     <Link href="/dashboard" className="text-indigo-400 text-sm hover:underline">
-                        Dashboard'a dön
+                        Back to Dashboard
                     </Link>
                 </div>
             </div>
@@ -115,14 +115,14 @@ export default function GroupPage() {
                         onClick={() => router.back()}
                         className="rounded-xl p-2 text-gray-400 hover:text-white
                        hover:bg-white/8 transition-colors"
-                        aria-label="Geri"
+                        aria-label="Go back"
                     >
                         ←
                     </button>
                     <div className="flex-1 min-w-0">
                         <h1 className="font-bold text-white truncate">{activeGroup.name}</h1>
                         <p className="text-xs text-gray-500">
-                            {activeGroup.members.length} üye
+                            {activeGroup.members.length} {activeGroup.members.length === 1 ? 'member' : 'members'}
                         </p>
                     </div>
                     {/* Member avatars (up to 4) */}
@@ -171,16 +171,16 @@ export default function GroupPage() {
                          py-4 text-sm text-gray-500 hover:text-gray-300
                          hover:border-white/25 transition-colors"
                         >
-                            + Harcama Ekle
+                            + Add Expense
                         </button>
                     )}
 
                     {/* Expense list header */}
                     <div className="flex items-center justify-between">
                         <h2 className="text-xs font-semibold tracking-widest text-gray-500 uppercase">
-                            Harcamalar
+                            Expenses
                         </h2>
-                        <span className="text-xs text-gray-600">{expenses.length} kayıt</span>
+                        <span className="text-xs text-gray-600">{expenses.length} {expenses.length === 1 ? 'item' : 'items'}</span>
                     </div>
 
                     {/* Skeleton */}
@@ -196,12 +196,12 @@ export default function GroupPage() {
                     {!expLoading && expenses.length === 0 && (
                         <div className="text-center py-12 space-y-2">
                             <div className="text-4xl">🧾</div>
-                            <p className="text-gray-500 text-sm">Henüz harcama yok.</p>
+                            <p className="text-gray-500 text-sm">No expenses yet.</p>
                             <button
                                 onClick={() => setShowAddForm(true)}
                                 className="text-indigo-400 text-sm hover:underline"
                             >
-                                İlk harcamayı ekle →
+                                Add the first expense →
                             </button>
                         </div>
                     )}
@@ -223,7 +223,7 @@ export default function GroupPage() {
                        border border-white/10 bg-white/4 px-4 py-3 mb-2 text-sm"
                     >
                         <span className="font-medium text-gray-300">
-                            Kim kime borçlu? {settlements.length > 0 && (
+                            Who owes who? {settlements.length > 0 && (
                                 <span className="ml-1.5 text-xs rounded-full bg-indigo-600
                                  px-2 py-0.5 text-white">{settlements.length}</span>
                             )}
@@ -234,13 +234,13 @@ export default function GroupPage() {
                     {(showSettlements) && (
                         <div className="rounded-2xl border border-white/10 bg-white/4 p-4">
                             <h2 className="text-xs font-semibold tracking-widest text-gray-500 uppercase mb-3">
-                                Kim kime borçlu?
+                                Who owes who?
                             </h2>
 
                             {settlements.length === 0 ? (
                                 <div className="text-center py-6 space-y-1">
                                     <div className="text-2xl">✅</div>
-                                    <p className="text-xs text-gray-600">Tüm hesaplar kapalı</p>
+                                    <p className="text-xs text-gray-600">All settled up</p>
                                 </div>
                             ) : (
                                 <SettlementSummary settlements={settlements} groupId={groupId} />
@@ -259,7 +259,7 @@ export default function GroupPage() {
                         className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-500
                        py-3 text-sm font-semibold text-white transition-colors"
                     >
-                        + Harcama Ekle
+                        + Add Expense
                     </button>
                     {settlements.length > 0 && (
                         <button
@@ -268,7 +268,7 @@ export default function GroupPage() {
                          border-green-500/30 py-3 text-sm font-semibold text-green-400
                          transition-colors"
                         >
-                            Hesapları Kapat
+                            Settle Up
                         </button>
                     )}
                 </div>

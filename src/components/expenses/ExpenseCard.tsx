@@ -22,7 +22,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
 };
 
 function formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString('tr-TR', {
+    return new Date(iso).toLocaleDateString('en-US', {
         day: 'numeric', month: 'short',
     });
 }
@@ -64,7 +64,7 @@ export function ExpenseCard({ expense, currentUserId }: ExpenseCardProps) {
                 <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate">{expense.description}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                        {displayName(expense.paidBy)} ödedi · {formatDate(expense.createdAt)}
+                        {displayName(expense.paidBy)} paid &middot; {formatDate(expense.createdAt)}
                     </p>
                 </div>
 
@@ -75,13 +75,13 @@ export function ExpenseCard({ expense, currentUserId }: ExpenseCardProps) {
                     </span>
                     {settledAll ? (
                         <span className="text-[10px] font-medium text-green-500 bg-green-500/10
-                             rounded-full px-2 py-0.5">✓ Kapalı</span>
+                             rounded-full px-2 py-0.5">✓ Settled</span>
                     ) : myOwed > 0 ? (
                         <span className="text-[10px] font-medium text-red-400 bg-red-500/10
                              rounded-full px-2 py-0.5">−${myOwed.toFixed(2)}</span>
                     ) : paidByMe ? (
                         <span className="text-[10px] font-medium text-indigo-400 bg-indigo-500/10
-                             rounded-full px-2 py-0.5">Sen ödedin</span>
+                             rounded-full px-2 py-0.5">You paid</span>
                     ) : null}
                 </div>
 
@@ -95,7 +95,7 @@ export function ExpenseCard({ expense, currentUserId }: ExpenseCardProps) {
             {expanded && (
                 <div className="border-t border-white/5 px-4 py-3 space-y-2">
                     <p className="text-[11px] font-semibold tracking-widest text-gray-500 uppercase mb-2">
-                        Bölüşüm
+                        Split
                     </p>
                     {expense.splits.map((split) => {
                         const isMe = split.userId === currentUserId;
@@ -109,7 +109,7 @@ export function ExpenseCard({ expense, currentUserId }: ExpenseCardProps) {
                                     <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${split.settled ? 'bg-green-500' : 'bg-gray-600'
                                         }`} />
                                     <span className={isMe ? 'text-indigo-300 font-medium' : 'text-gray-400'}>
-                                        {isMe ? 'Sen' : split.userId.slice(0, 8) + '…'}
+                                        {isMe ? 'You' : split.userId.slice(0, 8) + '…'}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2">

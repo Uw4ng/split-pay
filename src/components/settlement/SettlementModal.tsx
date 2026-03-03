@@ -119,7 +119,7 @@ export function SettlementModal({
             void useUserStore.getState().refreshBalance();
 
         } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Ödeme başarısız';
+            const msg = err instanceof Error ? err.message : 'Payment failed';
             setRows((prev) => ({ ...prev, [key]: { status: 'error', txHash: null, error: msg } }));
         }
     }
@@ -149,15 +149,15 @@ export function SettlementModal({
                 {/* ── Header ─────────────────────────────────────────────────────── */}
                 <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/5">
                     <div>
-                        <h2 className="text-base font-semibold text-white">Borçlarımı Öde</h2>
-                        <p className="text-xs text-gray-500 mt-0.5">USDC olarak anında ödeme</p>
+                        <h2 className="text-base font-semibold text-white">Pay My Debts</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">Instant USDC settlement</p>
                     </div>
                     <button
                         onClick={() => { if (!anyPending) onClose(); }}
                         disabled={anyPending}
                         className="rounded-lg p-1.5 text-gray-400 hover:text-white hover:bg-white/10
                        transition-colors disabled:opacity-30"
-                        aria-label="Kapat"
+                        aria-label="Close"
                     >
                         ✕
                     </button>
@@ -168,8 +168,8 @@ export function SettlementModal({
                     {allDone ? (
                         <div className="text-center py-8 space-y-3">
                             <div className="text-5xl">🎉</div>
-                            <p className="text-white font-semibold">Tüm borçlar ödendi!</p>
-                            <p className="text-sm text-gray-400">Hesaplar kapatıldı.</p>
+                            <p className="text-white font-semibold">All debts paid!</p>
+                            <p className="text-sm text-gray-400">All settled up.</p>
                         </div>
                     ) : (
                         settlements.map((s) => {
@@ -194,13 +194,13 @@ export function SettlementModal({
                                         {/* Status / button */}
                                         {row.status === 'success' ? (
                                             <span className="flex items-center gap-1.5 text-green-400 text-sm font-medium">
-                                                <span className="text-lg">✓</span> Ödendi
+                                                <span className="text-lg">✓</span> Paid
                                             </span>
                                         ) : row.status === 'pending' ? (
                                             <span className="flex items-center gap-2 text-gray-400 text-sm">
                                                 <span className="h-4 w-4 rounded-full border-2 border-indigo-500
                                          border-t-transparent animate-spin" />
-                                                Gönderiliyor…
+                                                Sending…
                                             </span>
                                         ) : (
                                             <button
@@ -210,7 +210,7 @@ export function SettlementModal({
                                    disabled:opacity-40 px-4 py-2 text-sm font-semibold
                                    text-white transition-colors"
                                             >
-                                                Öde
+                                                Pay
                                             </button>
                                         )}
                                     </div>
@@ -239,7 +239,7 @@ export function SettlementModal({
                                                 className="flex-shrink-0 text-xs text-red-400 hover:text-red-300
                                    underline transition-colors"
                                             >
-                                                Tekrar dene
+                                                Retry
                                             </button>
                                         </div>
                                     )}
@@ -264,10 +264,10 @@ export function SettlementModal({
                                     <>
                                         <span className="h-4 w-4 rounded-full border-2 border-white/30
                                      border-t-white animate-spin" />
-                                        Ödeniyor…
+                                        Paying…
                                     </>
                                 ) : (
-                                    `Tümünü Öde · $${settlements.reduce((s, x) => s + x.amount, 0).toFixed(2)} USDC`
+                                    `Pay All · $${settlements.reduce((s, x) => s + x.amount, 0).toFixed(2)} USDC`
                                 )}
                             </button>
                         )}
@@ -277,7 +277,7 @@ export function SettlementModal({
                             className="w-full rounded-xl border border-white/10 py-2.5 text-sm
                          text-gray-400 hover:bg-white/5 disabled:opacity-30 transition-colors"
                         >
-                            {anyPending ? 'İşlem devam ediyor…' : 'Kapat'}
+                            {anyPending ? 'Payment in progress…' : 'Close'}
                         </button>
                     </div>
                 )}
@@ -289,7 +289,7 @@ export function SettlementModal({
                             className="w-full rounded-xl bg-green-600 hover:bg-green-500
                          py-3 text-sm font-semibold text-white transition-colors"
                         >
-                            Tamam
+                            Done
                         </button>
                     </div>
                 )}

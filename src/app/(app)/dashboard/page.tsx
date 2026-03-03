@@ -45,7 +45,7 @@ function GroupCard({ group, userId }: { group: Group; userId: string }) {
                     <div>
                         <h3 className="font-semibold text-white text-sm leading-tight">{group.name}</h3>
                         <p className="text-xs text-gray-500 mt-0.5">
-                            {group.members.length} üye
+                            {group.members.length} {group.members.length === 1 ? 'member' : 'members'}
                         </p>
                     </div>
                 </div>
@@ -53,8 +53,8 @@ function GroupCard({ group, userId }: { group: Group; userId: string }) {
                 {/* Balance pill */}
                 {balance !== 0 && (
                     <span className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${isOwed
-                            ? 'bg-green-500/15 text-green-400'
-                            : 'bg-red-500/15 text-red-400'
+                        ? 'bg-green-500/15 text-green-400'
+                        : 'bg-red-500/15 text-red-400'
                         }`}>
                         {isOwed ? '+' : '−'}${fmtUSDC(Math.abs(balance))}
                     </span>
@@ -63,11 +63,11 @@ function GroupCard({ group, userId }: { group: Group; userId: string }) {
 
             {/* Balance label */}
             <p className={`text-xs ${isOwed ? 'text-green-500' :
-                    isOwing ? 'text-red-400' : 'text-gray-600'
+                isOwing ? 'text-red-400' : 'text-gray-600'
                 }`}>
-                {isOwed ? `$${fmtUSDC(balance)} alacaklısın` :
-                    isOwing ? `$${fmtUSDC(Math.abs(balance))} borçlusun` :
-                        'Hesaplar kapalı ✓'}
+                {isOwed ? `$${fmtUSDC(balance)} owed to you` :
+                    isOwing ? `$${fmtUSDC(Math.abs(balance))} you owe` :
+                        'All settled ✓'}
             </p>
         </Link>
     );
@@ -122,9 +122,9 @@ export default function DashboardPage() {
                 {/* Welcome + CTA */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <p className="text-xs text-gray-500 mb-0.5">Hoş geldin 👋</p>
+                        <p className="text-xs text-gray-500 mb-0.5">Welcome 👋</p>
                         <p className="text-sm font-medium text-gray-300">
-                            {user?.displayName ?? user?.email?.split('@')[0] ?? 'Kullanıcı'}
+                            {user?.displayName ?? user?.email?.split('@')[0] ?? 'there'}
                         </p>
                     </div>
                     <button
@@ -134,7 +134,7 @@ export default function DashboardPage() {
                        transition-colors"
                     >
                         <span className="text-base leading-none">+</span>
-                        Yeni Grup
+                        New Group
                     </button>
                 </div>
 
@@ -148,7 +148,7 @@ export default function DashboardPage() {
                 {/* Group list */}
                 <section>
                     <h2 className="text-xs font-semibold tracking-widest text-gray-500 uppercase mb-3">
-                        Gruplarım
+                        My Groups
                     </h2>
 
                     {isLoading && groups.length === 0 ? (
@@ -162,12 +162,12 @@ export default function DashboardPage() {
                         /* Empty state */
                         <div className="text-center py-16 space-y-3">
                             <div className="text-5xl">🧾</div>
-                            <p className="text-gray-400 text-sm">Henüz grubun yok.</p>
+                            <p className="text-gray-400 text-sm">No groups yet.</p>
                             <button
                                 onClick={() => setShowCreate(true)}
                                 className="mt-2 text-indigo-400 text-sm hover:underline"
                             >
-                                İlk grubunu oluştur →
+                                Create your first group →
                             </button>
                         </div>
                     ) : (

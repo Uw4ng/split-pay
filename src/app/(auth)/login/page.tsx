@@ -57,7 +57,7 @@ export default function LoginPage() {
                         Split<span className="text-indigo-400">Pay</span>
                     </h1>
                     <p className="mt-2 text-sm text-gray-400">
-                        Harcamaları paylaş. USDC ile öde.
+                        Split expenses. Settle with USDC.
                     </p>
                 </div>
 
@@ -69,10 +69,11 @@ export default function LoginPage() {
                             <div className="flex justify-center">
                                 <span className="text-5xl" role="img" aria-label="email sent">📬</span>
                             </div>
-                            <h2 className="text-lg font-semibold text-white">Link gönderildi!</h2>
+                            <h2 className="text-lg font-semibold text-white">Link sent!</h2>
                             <p className="text-sm text-gray-400 leading-relaxed">
-                                <strong className="text-gray-200">{email}</strong> adresine giriş
-                                linki gönderdik. Gelen kutunu kontrol et.
+                                We sent a sign-in link to{' '}
+                                <strong className="text-gray-200">{email}</strong>.
+                                Check your inbox.
                             </p>
                             <button
                                 type="button"
@@ -81,7 +82,7 @@ export default function LoginPage() {
                            border border-white/10 text-gray-300 hover:bg-white/5
                            transition-colors"
                             >
-                                Farklı e-posta kullan
+                                Use a different email
                             </button>
                         </div>
                     ) : (
@@ -92,14 +93,14 @@ export default function LoginPage() {
                                     htmlFor="email"
                                     className="block text-sm font-medium text-gray-300 mb-1.5"
                                 >
-                                    E-posta adresi
+                                    Email address
                                 </label>
                                 <input
                                     id="email"
                                     type="email"
                                     autoComplete="email"
                                     required
-                                    placeholder="sen@example.com"
+                                    placeholder="you@example.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     disabled={stage === 'loading'}
@@ -140,16 +141,15 @@ export default function LoginPage() {
                                     <>
                                         <span className="h-4 w-4 rounded-full border-2 border-white/30
                                      border-t-white animate-spin" />
-                                        Gönderiliyor…
+                                        Sending…
                                     </>
                                 ) : (
-                                    'Giriş Linki Gönder'
+                                    'Send Magic Link'
                                 )}
                             </button>
 
                             <p className="text-center text-xs text-gray-500 leading-relaxed mt-2">
-                                Şifre yok. Cüzdan adresi veya private key gerekmez.
-                                <br />Sadece e-postana tıkla.
+                                No passwords. No private keys. No seed phrases.<br />Just click the link in your email.
                             </p>
                         </form>
                     )}

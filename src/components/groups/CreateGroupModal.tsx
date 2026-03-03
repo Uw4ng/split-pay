@@ -24,7 +24,7 @@ function EmailChip({ email, onRemove }: { email: string; onRemove: () => void })
             <button
                 type="button"
                 onClick={onRemove}
-                aria-label={`${email} kişisini kaldır`}
+                aria-label={`Remove ${email}`}
                 className="text-indigo-400 hover:text-white transition-colors leading-none"
             >
                 ×
@@ -51,11 +51,11 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
         const trimmed = emailInput.trim().toLowerCase();
         if (!trimmed) return;
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-            setEmailError('Geçerli bir e-posta gir');
+            setEmailError('Enter a valid email address');
             return;
         }
         if (emails.includes(trimmed)) {
-            setEmailError('Bu e-posta zaten eklendi');
+            setEmailError('This email has already been added');
             return;
         }
         setEmails((prev) => [...prev, trimmed]);
@@ -94,7 +94,7 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
 
             onCreated();
         } catch (err) {
-            setSubmitError(err instanceof Error ? err.message : 'Grup oluşturulamadı');
+            setSubmitError(err instanceof Error ? err.message : 'Failed to create group');
         }
     }
 
@@ -111,11 +111,11 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                       bg-gray-900 shadow-2xl overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/5">
-                    <h2 className="text-base font-semibold text-white">Yeni Grup Oluştur</h2>
+                    <h2 className="text-base font-semibold text-white">Create a New Group</h2>
                     <button
                         onClick={onClose}
                         className="rounded-lg p-1.5 text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-                        aria-label="Kapat"
+                        aria-label="Close"
                     >
                         ✕
                     </button>
@@ -125,14 +125,14 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                     {/* Group name */}
                     <div>
                         <label htmlFor="group-name" className="block text-xs font-medium text-gray-400 mb-1.5">
-                            Grup Adı *
+                            Group Name *
                         </label>
                         <input
                             id="group-name"
                             type="text"
                             autoFocus
                             required
-                            placeholder="ör. Yaz Tatili 2025"
+                            placeholder="e.g. Summer Trip 2025"
                             maxLength={100}
                             value={name}
                             onChange={(e) => setName(e.target.value)}
@@ -148,7 +148,7 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                     {/* Member emails */}
                     <div>
                         <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                            Üye Ekle <span className="text-gray-600">(isteğe bağlı)</span>
+                            Add Members <span className="text-gray-600">(optional)</span>
                         </label>
 
                         {/* Chips */}
@@ -165,7 +165,7 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                             <input
                                 ref={inputRef}
                                 type="email"
-                                placeholder="ornek@email.com"
+                                placeholder="friend@example.com"
                                 value={emailInput}
                                 onChange={(e) => { setEmailInput(e.target.value); setEmailError(''); }}
                                 onKeyDown={handleEmailKeyDown}
@@ -183,14 +183,14 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                                 className="rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-40
                            px-4 py-3 text-sm font-medium text-white transition-colors"
                             >
-                                Ekle
+                                Add
                             </button>
                         </div>
                         {emailError && (
                             <p className="mt-1.5 text-xs text-red-400">{emailError}</p>
                         )}
                         <p className="mt-1.5 text-xs text-gray-600">
-                            Enter ile de ekleyebilirsin. Üyeler ilk girişte otomatik wallet alır.
+                            Press Enter to add. Members get a wallet automatically on first sign-in.
                         </p>
                     </div>
 
@@ -210,7 +210,7 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                             className="flex-1 rounded-xl border border-white/10 px-4 py-3
                          text-sm font-medium text-gray-300 hover:bg-white/5 transition-colors"
                         >
-                            İptal
+                            Cancel
                         </button>
                         <button
                             type="submit"
@@ -223,10 +223,10 @@ export function CreateGroupModal({ onClose, onCreated }: CreateGroupModalProps) 
                                 <>
                                     <span className="h-4 w-4 rounded-full border-2 border-white/30
                                    border-t-white animate-spin" />
-                                    Oluşturuluyor…
+                                    Creating…
                                 </>
                             ) : (
-                                'Oluştur'
+                                'Create Group'
                             )}
                         </button>
                     </div>

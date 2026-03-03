@@ -22,12 +22,12 @@ interface AddExpenseFormProps {
 type SplitMode = 'equal' | 'custom';
 
 const CATEGORIES: { value: ExpenseCategory; label: string; emoji: string }[] = [
-    { value: 'food', label: 'Yemek', emoji: '🍽️' },
-    { value: 'transport', label: 'Ulaşım', emoji: '🚗' },
-    { value: 'accommodation', label: 'Konaklama', emoji: '🏠' },
-    { value: 'entertainment', label: 'Eğlence', emoji: '🎬' },
-    { value: 'utilities', label: 'Fatura', emoji: '⚡' },
-    { value: 'other', label: 'Diğer', emoji: '📦' },
+    { value: 'food', label: 'Food', emoji: '🍽️' },
+    { value: 'transport', label: 'Transport', emoji: '🚗' },
+    { value: 'accommodation', label: 'Accommodation', emoji: '🏠' },
+    { value: 'entertainment', label: 'Entertainment', emoji: '🎬' },
+    { value: 'utilities', label: 'Utilities', emoji: '⚡' },
+    { value: 'other', label: 'Other', emoji: '📦' },
 ];
 
 export function AddExpenseForm({ group, currentUserId, onSuccess, onCancel }: AddExpenseFormProps) {
@@ -89,8 +89,8 @@ export function AddExpenseForm({ group, currentUserId, onSuccess, onCancel }: Ad
         e.preventDefault();
         setError('');
 
-        if (!description.trim()) { setError('Açıklama zorunlu'); return; }
-        if (amount <= 0) { setError('Tutar 0\'dan büyük olmalı'); return; }
+        if (!description.trim()) { setError('Description is required'); return; }
+        if (amount <= 0) { setError('Amount must be greater than 0'); return; }
 
         const splits = computeSplits();
         const validationError = validateSplits(amount, splits);
@@ -107,7 +107,7 @@ export function AddExpenseForm({ group, currentUserId, onSuccess, onCancel }: Ad
             });
             onSuccess();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Harcama eklenemedi');
+            setError(err instanceof Error ? err.message : 'Failed to add expense');
         }
     }
 
@@ -115,21 +115,21 @@ export function AddExpenseForm({ group, currentUserId, onSuccess, onCancel }: Ad
 
     return (
         <div className="rounded-2xl border border-white/10 bg-gray-900 p-5">
-            <h3 className="text-base font-semibold text-white mb-5">Harcama Ekle</h3>
+            <h3 className="text-base font-semibold text-white mb-5">Add Expense</h3>
 
             <form onSubmit={handleSubmit} className="space-y-4">
 
                 {/* Description */}
                 <div>
                     <label className="block text-xs font-medium text-gray-400 mb-1.5" htmlFor="exp-desc">
-                        Açıklama *
+                        Description *
                     </label>
                     <input
                         id="exp-desc"
                         type="text"
                         autoFocus
                         required
-                        placeholder="ör. Akşam yemeği"
+                        placeholder="e.g. Dinner at Mario's"
                         maxLength={200}
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
@@ -144,7 +144,7 @@ export function AddExpenseForm({ group, currentUserId, onSuccess, onCancel }: Ad
                     {/* Amount */}
                     <div className="flex-1">
                         <label className="block text-xs font-medium text-gray-400 mb-1.5" htmlFor="exp-amount">
-                            Tutar (USDC) *
+                            Amount (USDC) *
                         </label>
                         <div className="relative">
                             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
@@ -167,7 +167,7 @@ export function AddExpenseForm({ group, currentUserId, onSuccess, onCancel }: Ad
                     {/* Category */}
                     <div className="w-36">
                         <label className="block text-xs font-medium text-gray-400 mb-1.5" htmlFor="exp-cat">
-                            Kategori
+                            Category
                         </label>
                         <select
                             id="exp-cat"
@@ -187,7 +187,7 @@ export function AddExpenseForm({ group, currentUserId, onSuccess, onCancel }: Ad
                 {/* Payer */}
                 <div>
                     <label className="block text-xs font-medium text-gray-400 mb-1.5" htmlFor="exp-payer">
-                        Ödeyen *
+                        Paid by *
                     </label>
                     <select
                         id="exp-payer"
@@ -199,7 +199,7 @@ export function AddExpenseForm({ group, currentUserId, onSuccess, onCancel }: Ad
                     >
                         {group.members.map((m) => (
                             <option key={m.id} value={m.id}>
-                                {memberName(m)}{m.id === currentUserId ? ' (Sen)' : ''}
+                                {memberName(m)}{m.id === currentUserId ? ' (You)' : ''}
                             </option>
                         ))}
                     </select>
@@ -208,27 +208,27 @@ export function AddExpenseForm({ group, currentUserId, onSuccess, onCancel }: Ad
                 {/* Split mode toggle */}
                 <div>
                     <div className="flex items-center justify-between mb-2.5">
-                        <span className="text-xs font-medium text-gray-400">Bölüşüm</span>
+                        <span className="text-xs font-medium text-gray-400">How to split</span>
                         <div className="flex rounded-lg border border-white/10 overflow-hidden text-xs">
                             <button
                                 type="button"
                                 onClick={() => setSplitMode('equal')}
                                 className={`px-3 py-1.5 font-medium transition-colors ${splitMode === 'equal'
-                                        ? 'bg-indigo-600 text-white'
-                                        : 'text-gray-400 hover:bg-white/5'
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'text-gray-400 hover:bg-white/5'
                                     }`}
                             >
-                                Eşit
+                                Equal
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setSplitMode('custom')}
                                 className={`px-3 py-1.5 font-medium transition-colors ${splitMode === 'custom'
-                                        ? 'bg-indigo-600 text-white'
-                                        : 'text-gray-400 hover:bg-white/5'
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'text-gray-400 hover:bg-white/5'
                                     }`}
                             >
-                                Özel
+                                Custom
                             </button>
                         </div>
                     </div>
@@ -276,7 +276,7 @@ export function AddExpenseForm({ group, currentUserId, onSuccess, onCancel }: Ad
                             {/* Remaining */}
                             <div className={`flex justify-between text-xs pt-1 border-t border-white/5 ${Math.abs(splitRemaining()) < 0.01 ? 'text-green-500' : 'text-red-400'
                                 }`}>
-                                <span>Kalan</span>
+                                <span>Remaining</span>
                                 <span>${splitRemaining().toFixed(2)}</span>
                             </div>
                         </div>
@@ -299,7 +299,7 @@ export function AddExpenseForm({ group, currentUserId, onSuccess, onCancel }: Ad
                         className="flex-1 rounded-xl border border-white/10 px-4 py-3
                        text-sm font-medium text-gray-300 hover:bg-white/5 transition-colors"
                     >
-                        İptal
+                        Cancel
                     </button>
                     <button
                         type="submit"
@@ -312,10 +312,10 @@ export function AddExpenseForm({ group, currentUserId, onSuccess, onCancel }: Ad
                             <>
                                 <span className="h-4 w-4 rounded-full border-2 border-white/30
                                  border-t-white animate-spin" />
-                                Kaydediliyor…
+                                Saving…
                             </>
                         ) : (
-                            'Harcama Ekle'
+                            'Add Expense'
                         )}
                     </button>
                 </div>
